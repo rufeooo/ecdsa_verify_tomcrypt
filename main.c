@@ -3,19 +3,19 @@
 
 int sha256_contents(FILE* file, unsigned char out_hash[32])
 {
-  const int BUFFER_SIZE = 256;
-  unsigned char buf[BUFFER_SIZE];
-  const int ITEM_SIZE = BUFFER_SIZE/sizeof(char);
-  size_t items = ITEM_SIZE;
-  hash_state c;
-  sha3_256_init(&c);
-  while (items == ITEM_SIZE)
-  {
-    items = fread(buf, sizeof(char), sizeof(buf)/sizeof(char), file);
+  fseek(file, 0, SEEK_END);
+  int buf_len = ftell(file);
+  rewind(file);
+  unsigned char* buf = malloc(buf_len);
+  int item_len = buf_len/sizeof(char);
 
-    sha3_process(&c, buf, items*sizeof(char));
-  }
-  sha3_done(&c, out_hash);
+  if (fread(buf, sizeof(char), item_len, file) != item_len)
+    return 1;
+  unsigned long hashlen = sizeof(*out_hash);
+  hash_state state;
+  sha256_init(&state);
+  sha256_process(&state, buf, buf_len);
+  sha256_done(&state, out_hash);
   return 0;
 }
 
@@ -68,8 +68,9 @@ int verify_ossl_signature()
     exit(1);
 
   // Hash message
-  unsigned char hash[256 / 8] = { 0xab, 0xfa, 0x5d, 0xfd, 0x7f, 0x90, 0xbe, 0xea, 0x2c, 0x7a, 0x06, 0x49, 0xbf, 0x63, 0xda, 0x17, 0x2f, 0x02, 0x4f, 0xe6, 0x9e, 0x56, 0xa1, 0x28, 0x84, 0xa7, 0xe8, 0xeb, 0xc9, 0x92, 0x5d, 0xc5};
-  /*sha256_contents(messageFile, hash);*/
+  unsigned char hash[256 / 8];
+  if (sha256_contents(messageFile, hash) != CRYPT_OK)
+    exit(2);
 
   for (int i = 0; i < sizeof(hash); ++i)
   {
